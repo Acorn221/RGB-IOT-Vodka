@@ -1,0 +1,307 @@
+openapi: 3.0.3
+info:
+  title: RGB Vodka API
+  description: HTTP API for controlling RGB LEDs on ESP32
+  version: 1.0.0
+
+servers:
+  - url: http://{ip}
+    variables:
+      ip:
+        description: ESP32 IP address
+
+paths:
+  /led:
+    get:
+      summary: Set LED color instantly
+      parameters:
+        - name: r
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 255
+        - name: g
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 255
+        - name: b
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 255
+        - name: color
+          in: query
+          description: Named color (red, green, blue, white, off)
+          schema:
+            type: string
+            enum: [red, green, blue, white, off]
+        - name: value
+          in: query
+          description: Brightness for named color (0-255)
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 255
+            default: 255
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColorResponse'
+        '400':
+          description: Missing color params
+
+  /led/off:
+    get:
+      summary: Turn off LEDs
+      responses:
+        '200':
+          description: Success
+
+  /led/fade:
+    get:
+      summary: Fade to color
+      parameters:
+        - name: r
+          in: query
+          schema:
+            type: integer
+        - name: g
+          in: query
+          schema:
+            type: integer
+        - name: b
+          in: query
+          schema:
+            type: integer
+        - name: color
+          in: query
+          schema:
+            type: string
+            enum: [red, green, blue, white, off]
+        - name: value
+          in: query
+          schema:
+            type: integer
+            default: 255
+        - name: duration
+          in: query
+          description: Fade duration in milliseconds
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Success
+
+  /led/sequence:
+    get:
+      summary: Start built-in sequence
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Sequence name
+          schema:
+            type: string
+            enum: [rainbow, flash, breathe, police]
+        - name: speed
+          in: query
+          description: Step duration in milliseconds
+          schema:
+            type: integer
+            default: 500
+        - name: queue
+          in: query
+          description: Add to queue instead of starting immediately
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'false'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SequenceResponse'
+
+    post:
+      summary: Run custom sequence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                steps:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SequenceStep'
+                queue:
+                  type: boolean
+                  description: Add to queue instead of starting immediately
+                  default: false
+                loop:
+                  type: boolean
+                  description: Loop the sequence (ignored if queue=true)
+                  default: false
+                clear:
+                  type: boolean
+                  description: Clear queue and stop current before starting
+                  default: false
+            examples:
+              simple:
+                summary: Simple red flash
+                value:
+                  steps:
+                    - r: 255
+                      g: 0
+                      b: 0
+                      duration: 1000
+              fade:
+                summary: Fade through colors
+                value:
+                  steps:
+                    - r: 255
+                      g: 0
+                      b: 0
+                      duration: 1000
+                      fade: true
+                    - r: 0
+                      g: 255
+                      b: 0
+                      duration: 1000
+                      fade: true
+                    - r: 0
+                      g: 0
+                      b: 255
+                      duration: 1000
+                      fade: true
+              queued:
+                summary: Add to queue
+                value:
+                  queue: true
+                  steps:
+                    - r: 255
+                      g: 0
+                      b: 0
+                      duration: 500
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SequenceResponse'
+
+  /led/stop:
+    get:
+      summary: Stop current sequence
+      parameters:
+        - name: clear
+          in: query
+          description: Also clear the queue
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'false'
+      responses:
+        '200':
+          description: Success
+
+  /led/clear:
+    get:
+      summary: Clear queue and stop everything
+      responses:
+        '200':
+          description: Success
+
+  /led/status:
+    get:
+      summary: Get current LED status
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+components:
+  schemas:
+    SequenceStep:
+      type: object
+      properties:
+        r:
+          type: integer
+          minimum: 0
+          maximum: 255
+          default: 0
+        g:
+          type: integer
+          minimum: 0
+          maximum: 255
+          default: 0
+        b:
+          type: integer
+          minimum: 0
+          maximum: 255
+          default: 0
+        duration:
+          type: integer
+          description: Duration in milliseconds
+          default: 500
+        fade:
+          type: boolean
+          description: Fade from previous color to this color
+          default: false
+
+    ColorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        r:
+          type: integer
+        g:
+          type: integer
+        b:
+          type: integer
+
+    SequenceResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        sequence:
+          type: string
+        steps:
+          type: integer
+        queued:
+          type: boolean
+        queueLength:
+          type: integer
+
+    StatusResponse:
+      type: object
+      properties:
+        r:
+          type: integer
+        g:
+          type: integer
+        b:
+          type: integer
+        fading:
+          type: boolean
+        sequence:
+          type: boolean
+        queueLength:
+          type: integer
